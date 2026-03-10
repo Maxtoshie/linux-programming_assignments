@@ -1,0 +1,13 @@
+# Binaries
+data_sync
+syscall_monitor
+monitor_service
+*.so
+
+# Build directories
+build/
+__pycache__/
+
+# Logs and Data
+trace_log.txt
+trace_output.txt
