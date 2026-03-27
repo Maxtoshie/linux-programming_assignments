@@ -7,58 +7,81 @@
 #include <netinet/in.h>
 
 /**
- * handle_client - Process individual student requests
+ * send_handler - Allows the server user to type a message to the client
+ * @sock_desc: Pointer to the socket descriptor
+ * Return: NULL
+ */
+void *send_handler(void *sock_desc)
+{
+	int sock = *(int *)sock_desc;
+	char message[1024];
+
+	while (fgets(message, 1024, stdin))
+	{
+		send(sock, message, strlen(message), 0);
+	}
+	return (NULL);
+}
+
+/**
+ * handle_client - Receives messages and spawns the sender thread
  * @socket_desc: Pointer to the client socket descriptor
  * Return: NULL
  */
 void *handle_client(void *socket_desc)
 {
 	int sock = *(int *)socket_desc;
-	char buffer[1024] = {0};
-	char *welcome = "ALU Digital Library: Enter Student ID to access: ";
-	char *access_ok = "Access Granted. Welcome to the Library!\n";
-	char *access_denied = "Access Denied. Invalid ID.\n";
+	char buffer[1024];
+	int read_size;
+	pthread_t sthread;
 
-	send(sock, welcome, strlen(welcome), 0);
-	recv(sock, buffer, 1024, 0);
+	pthread_create(&sthread, NULL, send_handler, (void *)&sock);
+	pthread_detach(sthread);
 
-	/* Mock validation: Only IDs starting with 'ALU' are granted access */
-	if (strncmp(buffer, "ALU", 3) == 0)
-		send(sock, access_ok, strlen(access_ok), 0);
-	else
-		send(sock, access_denied, strlen(access_denied), 0);
+	while ((read_size = recv(sock, buffer, 1024, 0)) > 0)
+	{
+		buffer[read_size] = '\0';
+		printf("\n[Student]: %s> ", buffer);
+		fflush(stdout);
+	}
 
 	close(sock);
 	free(socket_desc);
 	return (NULL);
 }
 
+/**
+ * main - Entry point for the bi-directional library server
+ * Return: 0 on success, 1 on error
+ */
 int main(void)
 {
 	int server_fd, *new_sock;
 	struct sockaddr_in address;
 	int addrlen = sizeof(address);
+	int opt = 1;
 
 	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(8080);
 
-	bind(server_fd, (struct sockaddr *)&address, sizeof(address));
+	if (bind(server_fd, (struct sockaddr *)&address, (socklen_t)addrlen) < 0)
+		return (1);
 	listen(server_fd, 5);
 
-	printf("Library Server started on port 8080...\n");
-
+	printf("Server started. You can type to connected clients.\n");
 	while (1)
 	{
 		int client_sock = accept(server_fd, (struct sockaddr *)&address,
 					 (socklen_t *)&addrlen);
-		pthread_t sniffer_thread;
-		new_sock = malloc(1);
-		*new_sock = client_sock;
+		pthread_t rthread;
 
-		pthread_create(&sniffer_thread, NULL, handle_client, (void *)new_sock);
-		pthread_detach(sniffer_thread);
+		new_sock = malloc(sizeof(int));
+		*new_sock = client_sock;
+		pthread_create(&rthread, NULL, handle_client, (void *)new_sock);
+		pthread_detach(rthread);
 	}
 	return (0);
 }
