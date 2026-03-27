@@ -43,7 +43,7 @@ void *aircraft(void *arg)
 		total_dispatched++;
 		printf("Dispatched luggage ID: %d (Remaining: %d)\n", item, count);
 
-		pthread_cond_signal(&cond_space, &mutex);
+		pthread_cond_signal(&cond_space);
 		pthread_mutex_unlock(&mutex);
 		sleep(4);
 	}
